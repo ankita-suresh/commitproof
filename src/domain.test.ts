@@ -1,0 +1,11 @@
+import {it,expect} from 'vitest';import {eligible,merge,approve,sampleCandidates,sampleRevisions,type Card} from './domain';import {validate} from '../server/validation';
+const candidate=sampleCandidates[0];
+it('blocks missing owner, warnings and withdrawals',()=>{expect(eligible({...candidate,owner:null})).toBe(false);expect(eligible({...candidate,warnings:['unclear']})).toBe(false);expect(eligible({...candidate,withdrawn:true})).toBe(false)});
+it('keeps unchanged version',()=>{const a=merge([],[candidate]);expect(merge(a,[candidate])[0].version).toBe(1)});
+it('retains earlier promise when revised',()=>{const a=merge([],[candidate]);const b=merge(a,[sampleRevisions[0]]);expect(b[0].version).toBe(2);expect(b[0].history[0].due).toBe('2026-10-30')});
+it('approves directly to the internal board',()=>{const t=merge([],[candidate])[0];expect(approve([],t)[0].status).toBe('todo')});
+it('conditional tasks start waiting',()=>{const t=merge([],[sampleRevisions[0]])[0];expect(approve([],t)[0].status).toBe('waiting')});
+it('does not duplicate an approved version',()=>{const t=merge([],[candidate])[0];const board=approve([],t);expect(approve(board,t)).toHaveLength(1)});
+it('new version replaces approved board snapshot',()=>{const a=merge([],[candidate]);const board=approve([],a[0]);const b=merge(a,[sampleRevisions[0]]);const updated=approve(board,b[0]);expect(updated).toHaveLength(1);expect(updated[0].task.version).toBe(2);expect(board[0].task.version).toBe(1)});
+it('does not approve vague tasks',()=>{const t=merge([],[sampleRevisions[2]])[0];expect(approve([],t)).toHaveLength(0)});
+it('rejects fabricated evidence and omitted previous tasks',()=>{expect(()=>validate({tasks:[candidate],notice:''},[],[])).toThrow();expect(()=>validate({tasks:[],notice:''},[],[candidate])).toThrow()});
